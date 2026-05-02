@@ -37,15 +37,28 @@ Both systems work together — the automated system maintains live state, while 
 
 ## Install
 
-### Quick Setup (have Claude do it)
+### Quick Setup
 
-Add the submodule to your project, then tell Claude:
+```bash
+git submodule add https://github.com/Sonovore/claude-code-handoff.git claude-code-handoff
+./claude-code-handoff/install.sh                    # project-local (default)
+./claude-code-handoff/install.sh --scope global     # global slash command, no hooks
+./claude-code-handoff/install.sh --scope both       # global slash command + project-local hooks
+```
 
-> Install claude-code-handoff following the instructions in claude-code-handoff/README.md
+Then complete steps **6** (configure settings.json), **7** (gitignore), and **8** (restart) below.
 
-Claude will create the symlinks and settings for you.
+### Scope: project / global / both
 
-### Step-by-Step
+| Scope    | `/handoff` command                                  | Hooks (live-handoff, etc.)        | When to use                                                                 |
+|----------|-----------------------------------------------------|-----------------------------------|------------------------------------------------------------------------------|
+| project  | symlinked into `<repo>/.claude/commands/`           | symlinked into `<repo>/.claude/hooks/` | Default. Slash command + auto-tracking are git-tracked alongside the project. |
+| global   | symlinked into `~/.claude/commands/` (one source)   | NOT installed                     | You want `/handoff` available in every repo without per-project setup. Hooks would auto-fire in repos that don't want them, so they stay opt-in. |
+| both     | global slash command + project-local hooks         | symlinked into `<repo>/.claude/hooks/` | Multi-worktree projects: one `/handoff` everywhere, hooks opt-in per repo. |
+
+The `/handoff` command is **worktree-aware**: if it detects a layout where the primary checkout has sibling worktrees (via `git worktree list`), it routes per-worktree state into each worktree's `.claude/` and merges a per-branch summary into the outer-root `.claude/context.md`. Single-checkout repos behave normally — context lands in `<repo>/.claude/`.
+
+### Step-by-Step (manual, if you don't run install.sh)
 
 **1. Add the submodule**
 
@@ -61,13 +74,17 @@ mkdir -p .claude/commands .claude/hooks
 
 **3. Symlink the command**
 
+Project-local:
 ```bash
-cd .claude/commands
-ln -sf ../../claude-code-handoff/handoff.md .
-cd ../..
+cd .claude/commands && ln -sf ../../claude-code-handoff/handoff.md . && cd ../..
 ```
 
-**4. Symlink the hooks**
+Global:
+```bash
+mkdir -p ~/.claude/commands && ln -sfn "$PWD/claude-code-handoff/handoff.md" ~/.claude/commands/handoff.md
+```
+
+**4. Symlink the hooks** (project-local — hooks should not be installed globally)
 
 ```bash
 cd .claude/hooks
