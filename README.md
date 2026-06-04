@@ -44,19 +44,19 @@ This repo is both a Claude Code **plugin** and its own single-plugin **marketpla
 /plugin install handoff
 ```
 
-The `/handoff` command is then available everywhere. The **hooks** only fire in projects that opt in (see below) — they stay dormant in every other repo.
+`/plugin install` enables the plugin globally — there's nothing to turn on per project, and nothing to remember. The `/handoff` command is available everywhere; the live hooks decide per project whether to run (see below).
 
-### Enable the hooks in a project
+### First-run consent (automatic)
 
-Plugin hooks activate per-project via `enabledPlugins` in that project's settings. Add a minimal `.claude/settings.json` at the repo root:
+The hooks are globally active but stay **dormant in any project until you opt in** — so they never clutter throwaway repos:
 
-```json
-{
-  "enabledPlugins": { "handoff": true }
-}
-```
+- The first time you send a message in a project that hasn't been set up, Claude asks **once** whether to enable automatic session-state tracking + `/handoff` for that project.
+- Your answer is saved to a per-project marker:
+  - **git repo:** `handoff-consent` in the repo's shared git dir — so one answer covers the primary checkout *and* every worktree.
+  - **non-git folder:** `.claude/handoff-consent` in that folder.
+- **Enable** → the hooks track this project. **Skip** → they stay silent here and never ask again.
 
-Commit it and every checkout — including each git worktree — activates the hooks automatically. To enable it only for yourself (not the team), put the same block in `.claude/settings.local.json` instead.
+To change your mind later, edit that `handoff-consent` file (`true`/`false`), or delete it to be asked again.
 
 ### Updating
 
@@ -80,7 +80,7 @@ The hooks and `/handoff` write session-specific files you don't want in version 
 .claude/mode
 ```
 
-(Keep `.claude/settings.json` tracked — that's the enable file above.)
+The consent marker lives in the repo's git dir (not the work tree), so it needs no gitignore entry.
 
 ## Files
 
@@ -93,6 +93,7 @@ claude-code-handoff/
 │   └── handoff.md                    # /handoff slash command (worktree-aware)
 ├── hooks/
 │   ├── hooks.json                    # hook event wiring (${CLAUDE_PLUGIN_ROOT})
+│   ├── handoff-lib.sh                # shared: per-project consent gating
 │   ├── session-start.sh              # SessionStart: loads context + session state
 │   ├── live-handoff.sh               # UserPromptSubmit: continuous state maintenance
 │   ├── post-edit-hook.sh             # PostToolUse: tracks file modifications

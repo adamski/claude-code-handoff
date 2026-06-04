@@ -9,6 +9,11 @@
 #   (see settings-snippet.json or the README for the full config)
 
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+. "$SCRIPT_DIR/handoff-lib.sh"
+[ "$(handoff_consent_state)" = true ] || exit 0
+
 cd "$(git rev-parse --show-toplevel)"
 
 echo ""

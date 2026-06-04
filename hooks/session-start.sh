@@ -9,13 +9,18 @@
 #   (see settings-snippet.json or the README for the full config)
 
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+. "$SCRIPT_DIR/handoff-lib.sh"
+# Stay silent unless this project has opted in (consent handled by live-handoff).
+[ "$(handoff_consent_state)" = true ] || exit 0
+
 cd "$(git rev-parse --show-toplevel)"
 
 echo "=== Session Context ==="
 echo ""
 
 # Live session state (maintained automatically by live-handoff)
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 "$SCRIPT_DIR/proactive-handoff.sh" load 2>/dev/null || true
 
 # Primary context file (written by all handoff modes)

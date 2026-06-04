@@ -13,6 +13,35 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+. "$SCRIPT_DIR/handoff-lib.sh"
+
+# Per-project consent gate. This is the only hook that prompts: on first
+# encounter (no marker) it asks the user; otherwise it honors the saved answer.
+CONSENT_STATE="$(handoff_consent_state)"
+if [ "$CONSENT_STATE" = false ]; then
+    exit 0
+elif [ "$CONSENT_STATE" = unset ]; then
+    CONSENT_FILE="$(handoff_consent_file)"
+    cat << SETUP
+<handoff-setup>
+This project has not been set up for session handoff tracking (claude-code-handoff plugin).
+Before responding to the user's message, ask them — using AskUserQuestion — whether to enable
+automatic session-state tracking and the /handoff command for THIS project.
+
+Record their choice as a single word in this exact file (create it):
+  ${CONSENT_FILE}
+  - enable -> write: true
+  - skip   -> write: false
+
+This is a one-time setup; the saved answer prevents asking again. After writing the file,
+continue with the user's request normally.
+</handoff-setup>
+SETUP
+    exit 0
+fi
+# CONSENT_STATE == true below — normal live-handoff behavior.
+
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 STATE_FILE="$REPO_ROOT/.claude/session-state.md"
 

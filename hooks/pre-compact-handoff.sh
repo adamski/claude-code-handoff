@@ -10,6 +10,10 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+. "$SCRIPT_DIR/handoff-lib.sh"
+[ "$(handoff_consent_state)" = true ] || exit 0
+
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 
 mkdir -p "$REPO_ROOT/.claude"

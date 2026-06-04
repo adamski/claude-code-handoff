@@ -10,6 +10,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+. "$SCRIPT_DIR/handoff-lib.sh"
+[ "$(handoff_consent_state)" = true ] || exit 0
 
 # Read JSON input from stdin
 INPUT=$(cat)
