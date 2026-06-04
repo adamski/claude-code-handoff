@@ -1,0 +1,32 @@
+{
+  "name": "claude-code-handoff",
+  "owner": {
+    "name": "Adam Wilson"
+  },
+  "metadata": {
+    "description": "Session context handoff for Claude Code",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "handoff",
+      "source": "./",
+      "description": "Save and resume session context across Claude Code sessions — worktree-aware routing, live session-state tracking, and context injection on resume/compaction.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Adam Wilson"
+      },
+      "license": "MIT",
+      "homepage": "https://github.com/adamski/claude-code-handoff",
+      "category": "workflow",
+      "keywords": [
+        "handoff",
+        "session",
+        "context",
+        "worktree",
+        "compaction",
+        "continuity"
+      ]
+    }
+  ]
+}

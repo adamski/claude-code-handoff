@@ -1,6 +1,5 @@
 ---
 description: Save session context for next session (worktree-aware)
-user_invocable: true
 ---
 
 # /handoff
