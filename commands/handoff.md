@@ -33,32 +33,65 @@ Run these commands to classify cwd:
 git rev-parse --git-dir >/dev/null 2>&1 || { echo "not in a git repo"; exit 1; }
 
 CURRENT_WORKTREE="$(git rev-parse --show-toplevel)"
-PRIMARY_REPO="$(dirname "$(git rev-parse --git-common-dir)")"
-[ "$PRIMARY_REPO" = "." ] && PRIMARY_REPO="$(cd "$(dirname "$(git rev-parse --git-common-dir)")" && pwd)"
-
-# Branch name for the current worktree (or "detached" / SHA if detached)
+# Canonical shared git dir — identical for every worktree of this repo (used for markers).
+GIT_COMMON="$(cd "$(git rev-parse --git-common-dir)" && pwd -P)"
+PRIMARY_REPO="$(dirname "$GIT_COMMON")"
 CURRENT_BRANCH="$(git symbolic-ref --short HEAD 2>/dev/null || git rev-parse --short HEAD)"
 
-# Detect outer-root layout: there is an outer root iff at least one OTHER worktree
-# shares a common grandparent with the primary repo.
-PRIMARY_PARENT="$(dirname "$PRIMARY_REPO")"
-OUTER_ROOT=""
-while IFS= read -r wt; do
-    wt_path="${wt#worktree }"
-    [ "$wt_path" = "$PRIMARY_REPO" ] && continue
-    wt_grandparent="$(dirname "$(dirname "$wt_path")")"
-    if [ "$wt_grandparent" = "$PRIMARY_PARENT" ]; then
-        OUTER_ROOT="$PRIMARY_PARENT"
-        break
+OUTER_MARKER="$GIT_COMMON/handoff-outer-root"   # remembers the decision: an absolute path, or "none"
+
+if [ -f "$OUTER_MARKER" ]; then
+    # Decision already made and remembered (covers every worktree of this repo).
+    OUTER_ROOT="$(cat "$OUTER_MARKER")"; [ "$OUTER_ROOT" = "none" ] && OUTER_ROOT=""
+    OUTER_STATE="resolved"
+else
+    # Detect a CANDIDATE outer root: another worktree of THIS repo whose grandparent is
+    # the primary repo's parent. Paths are canonicalized (pwd -P) so symlinked locations
+    # (/tmp, symlinked homes) don't cause false misses.
+    PRIMARY_PARENT="$(dirname "$PRIMARY_REPO")"
+    CANDIDATE=""
+    while IFS= read -r wt; do
+        wt_path="${wt#worktree }"; [ "$wt_path" = "$PRIMARY_REPO" ] && continue
+        wt_real="$(cd "$wt_path" 2>/dev/null && pwd -P)" || continue
+        [ "$(dirname "$(dirname "$wt_real")")" = "$PRIMARY_PARENT" ] && { CANDIDATE="$PRIMARY_PARENT"; break; }
+    done < <(git worktree list --porcelain | grep '^worktree ')
+
+    # GUARD: if the candidate parent holds ANY other independent git repo (a different
+    # --git-common-dir), it's a shared dev folder, not a project root → do not use it.
+    # This prevents writing project context into, e.g., ~/dev where many repos coexist.
+    if [ -n "$CANDIDATE" ]; then
+        foreign=0
+        for d in "$CANDIDATE"/*/; do
+            d="${d%/}"; git -C "$d" rev-parse --git-dir >/dev/null 2>&1 || continue
+            dc="$(git -C "$d" rev-parse --git-common-dir 2>/dev/null)"; case "$dc" in /*) ;; *) dc="$d/$dc";; esac
+            dc="$(cd "$dc" 2>/dev/null && pwd -P)" || continue
+            [ "$dc" = "$GIT_COMMON" ] || foreign=$((foreign+1))   # our own worktrees share GIT_COMMON
+        done
+        [ "$foreign" -gt 0 ] && CANDIDATE=""
     fi
-done < <(git worktree list --porcelain | grep '^worktree ')
+
+    if [ -n "$CANDIDATE" ]; then
+        OUTER_ROOT=""; OUTER_STATE="confirm"          # newly detected — must confirm with the user
+        echo "CANDIDATE_OUTER_ROOT=$CANDIDATE"
+    else
+        OUTER_ROOT=""; OUTER_STATE="none"             # no outer root; re-detected on each run
+    fi
+fi
+echo "OUTER_STATE=$OUTER_STATE  OUTER_ROOT=${OUTER_ROOT:-<none>}"
 ```
 
 After this:
 
 - `CURRENT_WORKTREE` — `.claude/` location for **per-worktree** files (`current-task.md`, `current-bug.md`, `bug-test-log.md`, `task-history.md`, `mode`, `session-state.md`, **and** the worktree-local `context.md`).
-- `OUTER_ROOT` — if non-empty, also write/update `$OUTER_ROOT/.claude/context.md` (project overview).
-- If `OUTER_ROOT` is empty (no multi-worktree layout), skip all outer-root steps; behave as a normal single-checkout handoff with `context.md` in `CURRENT_WORKTREE/.claude/`.
+- **`OUTER_STATE` drives the outer-root handling:**
+  - **`resolved`** — decision was made before and remembered in `$OUTER_MARKER`. Use `OUTER_ROOT` as-is (a path, or empty); do not ask.
+  - **`none`** — no outer root (single checkout, or the guard rejected a shared parent). Behave as a normal single-checkout handoff with `context.md` in `$CURRENT_WORKTREE/.claude/`.
+  - **`confirm`** — a candidate outer root (`$CANDIDATE_OUTER_ROOT`) was newly detected. **Before writing any outer-root file**, ask the user with AskUserQuestion:
+    > "Detected a shared project-overview folder at `<CANDIDATE_OUTER_ROOT>` (it contains this repo's worktrees). Write a cross-worktree project overview there?"
+    - **Yes** → run `printf '%s\n' "<CANDIDATE_OUTER_ROOT>" > "$OUTER_MARKER"` and set `OUTER_ROOT` to that path.
+    - **No** → run `printf 'none\n' > "$OUTER_MARKER"` and leave `OUTER_ROOT` empty.
+    The marker lives in the shared git dir, so this is asked **at most once per project** (it covers all worktrees). To change the decision later, edit or delete `$OUTER_MARKER`.
+- When `OUTER_ROOT` is non-empty, also write/update `$OUTER_ROOT/.claude/context.md` (project overview).
 
 **File routing summary**:
 
