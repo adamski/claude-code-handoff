@@ -19,7 +19,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # Never touch a project that hasn't opted in (this is also invoked directly on PreCompact).
 [ "$(handoff_consent_state)" = true ] || exit 0
 
-REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+REPO_ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 STATE_FILE="$REPO_ROOT/.claude/session-state.md"
 BACKUP_FILE="$REPO_ROOT/.claude/session-state.md.bak"
 

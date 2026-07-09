@@ -42,7 +42,7 @@ SETUP
 fi
 # CONSENT_STATE == true below — normal live-handoff behavior.
 
-REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+REPO_ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 STATE_FILE="$REPO_ROOT/.claude/session-state.md"
 
 # Ensure .claude directory exists
